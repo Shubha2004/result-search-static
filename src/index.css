@@ -1,0 +1,20 @@
+@import "tailwindcss";
+
+/* Dark mode via .dark class on <html> (persisted in localStorage) */
+@custom-variant dark (&:where(.dark, .dark *));
+
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Print-friendly result card */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+}
