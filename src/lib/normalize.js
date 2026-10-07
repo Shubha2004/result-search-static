@@ -1,7 +1,7 @@
 /* Normalization + tolerant name matching.
    Roll number is ALWAYS the primary key. Names are secondary verification only. */
 
-/** Strip everything but digits: "2301 4154 0178" -> "230141540178" */
+/** Strip everything but digits: "1234 5678 9012" -> "123456789012" */
 export function normalizeRoll(raw) {
   return String(raw || '').replace(/\D/g, '')
 }
