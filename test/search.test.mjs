@@ -4,6 +4,7 @@ import 'fake-indexeddb/auto'
 const { addCandidates, addResults, clearCandidates, clearResults, clearMeta } =
   await import('../src/lib/db.js')
 const { searchCandidate } = await import('../src/lib/search.js')
+const { searchByName } = await import('../src/lib/search.js')
 const { normalizeRoll, normalizeName, nameMatches } = await import('../src/lib/normalize.js')
 
 await clearCandidates(); await clearResults(); await clearMeta()
@@ -61,6 +62,28 @@ r = await searchCandidate('990000000005', '')
 check('candidate with no result -> result_unavailable', r.status === 'result_unavailable')
 r = await searchCandidate('', 'Rahul Kumar')
 check('empty roll -> not_found', r.status === 'not_found')
+
+// name-only search
+r = await searchByName('Test Candidate One')
+check('name-only exact unique -> found', r.status === 'found' && r.result.resultCode === 'Q')
+r = await searchByName('test candidate two')
+check('name-only case-insensitive -> found', r.status === 'found' && r.result.resultCode === 'SNC')
+r = await searchByName('Rahul Kumar')
+check('name-only exact full name -> found (unique exact match)', r.status === 'found')
+r = await searchByName('Rahul')
+check('name-only "Rahul" matches Kumar+Kumari -> name_ambiguous, user picks',
+  r.status === 'name_ambiguous' && r.candidates.length === 2)
+check('ambiguous list shows rolls, no result leaked',
+  r.status === 'name_ambiguous' && !('result' in r) && r.candidates.every((c) => c.rollNumber))
+r = await searchByName('Kumari')
+check('name-only "Kumari" -> exact-token match, unique -> found',
+  r.status === 'found' && r.candidate.rollNumber === '990000000004')
+r = await searchByName('No Result Person')
+check('name-only, candidate with no result -> result_unavailable', r.status === 'result_unavailable')
+r = await searchByName('ZZZ Nobody Here')
+check('name-only no match -> not_found', r.status === 'not_found')
+r = await searchByName('')
+check('name-only empty -> not_found', r.status === 'not_found')
 
 console.log(`\n${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)

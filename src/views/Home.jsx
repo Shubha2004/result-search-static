@@ -1,6 +1,6 @@
 /* Home: search by Roll Number + Candidate Name. Queries IndexedDB only. */
 import { useState } from 'react'
-import { searchCandidate } from '../lib/search.js'
+import { searchCandidate, searchByName } from '../lib/search.js'
 import { countCandidates } from '../lib/db.js'
 import ResultCard from '../components/ResultCard.jsx'
 
@@ -12,13 +12,27 @@ export default function Home({ adminMode }) {
 
   const doSearch = async (e) => {
     e?.preventDefault()
-    if (!roll.trim()) {
-      setState({ phase: 'done', outcome: { status: 'not_found', reason: 'empty_roll' } })
+    const hasRoll = roll.trim().length > 0
+    const hasName = name.trim().length > 0
+    if (!hasRoll && !hasName) {
+      setState({ phase: 'done', outcome: { status: 'not_found', reason: 'empty_both' } })
       return
     }
     setState({ phase: 'loading' })
     try {
-      const outcome = await searchCandidate(roll, name)
+      const outcome = hasRoll
+        ? await searchCandidate(roll, name)
+        : await searchByName(name)
+      setState({ phase: 'done', outcome })
+    } catch (err) {
+      setState({ phase: 'done', outcome: { status: 'error', message: String(err?.message || err) } })
+    }
+  }
+
+  const viewCandidate = async (candidate) => {
+    setState({ phase: 'loading' })
+    try {
+      const outcome = await searchCandidate(candidate.rollNumber, '')
       setState({ phase: 'done', outcome })
     } catch (err) {
       setState({ phase: 'done', outcome: { status: 'error', message: String(err?.message || err) } })
@@ -44,7 +58,7 @@ export default function Home({ adminMode }) {
           PROVISIONAL RESULT SEARCH
         </h1>
         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400 sm:text-base">
-          Search your result using Roll Number and Name
+          Search your result using Roll Number, or by Name alone
         </p>
       </header>
 
@@ -102,13 +116,20 @@ export default function Home({ adminMode }) {
       </form>
 
       <div className="mt-6" aria-live="polite">
-        {state.phase === 'done' && <Outcome outcome={state.outcome} onRetry={clear} adminMode={adminMode} />}
+        {state.phase === 'done' && (
+          <Outcome
+            outcome={state.outcome}
+            onRetry={clear}
+            adminMode={adminMode}
+            onSelectCandidate={viewCandidate}
+          />
+        )}
       </div>
     </div>
   )
 }
 
-function Outcome({ outcome, onRetry, adminMode }) {
+function Outcome({ outcome, onRetry, adminMode, onSelectCandidate }) {
   switch (outcome.status) {
     case 'found':
       return (
@@ -145,6 +166,37 @@ function Outcome({ outcome, onRetry, adminMode }) {
           )}
         </Notice>
       )
+    case 'name_ambiguous':
+      return (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-blue-900 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-200">
+          <p className="font-semibold">
+            {outcome.candidates.length} candidates match that name
+          </p>
+          <p className="mt-1 text-sm">Select your record to view the result:</p>
+          <ul className="mt-3 space-y-2">
+            {outcome.candidates.map((c) => (
+              <li
+                key={c.rollNumber}
+                className="flex items-center justify-between gap-3 rounded-lg border border-blue-200 bg-white px-3 py-2 dark:border-blue-800 dark:bg-slate-800"
+              >
+                <div className="min-w-0">
+                  <p className="truncate font-medium text-slate-900 dark:text-white">{c.name}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Roll: {c.rollNumber}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onSelectCandidate(c)}
+                  className="no-print shrink-0 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                >
+                  View result
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )
     case 'name_mismatch':
       return (
         <Notice tone="red" title="Name does not match">
@@ -170,9 +222,11 @@ function Outcome({ outcome, onRetry, adminMode }) {
     default:
       return (
         <Notice tone="red" title="No matching candidate was found.">
-          {outcome.reason === 'empty_roll'
-            ? 'Please enter a roll number.'
-            : 'Please check your Roll Number and Name and try again.'}
+          {outcome.reason === 'empty_both'
+            ? 'Please enter a roll number or a name.'
+            : outcome.reason === 'name'
+              ? 'No candidate matches that name. Please check the spelling and try again.'
+              : 'Please check your Roll Number and Name and try again.'}
           <Suggestions />
           <button
             onClick={onRetry}

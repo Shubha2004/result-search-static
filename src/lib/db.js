@@ -47,6 +47,12 @@ export async function getCandidatesByRoll(rollNumber) {
   return db.getAllFromIndex('candidates', 'rollNumber', rollNumber)
 }
 
+/** All candidate records (used by name-only search; data sizes are small). */
+export async function getAllCandidates() {
+  const db = await getDB()
+  return db.getAll('candidates')
+}
+
 export async function getCandidatesByNamePrefix(normalizedName, limit = 50) {
   const db = await getDB()
   const tx = db.transaction('candidates', 'readonly')
